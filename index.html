@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>P2P Chat Platform</title>
+    <title>Encrypted Chat</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <style>
@@ -25,22 +25,45 @@
             margin-bottom: 10px;
             background-color: #f9f9f9;
         }
-        #message-input, #peer-id-input {
+        #message-input {
+            width: calc(100% - 270px);
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        #peer-id-input {
             width: calc(100% - 90px);
             padding: 8px;
             border-radius: 4px;
             border: 1px solid #ccc;
         }
-        #send-button, #connect-button {
+        #send-button, #connect-button, #delete-history-button {
             padding: 8px 16px;
             border-radius: 4px;
+        }
+        #file-input {
+            padding: 8px;
+            border-radius: 4px;
+        }
+        .footer-fineprint {
+            font-size: 0.75rem;
+            color: #6b7280;
+            text-align: center;
+            margin-top: 1rem;
+        }
+        .footer-fineprint a {
+            color: #3b82f6;
+            text-decoration: none;
+        }
+        .footer-fineprint a:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
 <body class="bg-gray-100">
     <div id="chat-container" class="bg-white shadow-lg">
-        <h1 class="text-2xl font-bold mb-4 text-center">P2P Chat Platform</h1>
-        <p class="text-gray-500 italic mb-4 text-center">Share your Peer ID with another user to chat in real-time. Messages are stored locally.</p>
+        <h1 class="text-2xl font-bold mb-2 text-center">P2P Chat Platform</h1>
+        <p class="text-gray-500 italic mb-4 text-center">Share your Peer ID with another user to chat in real-time. Messages and files are stored locally.</p>
         <div class="mb-4">
             <label class="block text-gray-700">Your Peer ID: <span id="my-peer-id" class="font-mono"></span></label>
             <input id="peer-id-input" type="text" placeholder="Enter friend's Peer ID..." class="mr-2 mt-2">
@@ -49,14 +72,23 @@
         <div id="messages" class="mb-4"></div>
         <div class="flex">
             <input id="message-input" type="text" placeholder="Type your message..." class="mr-2">
-            <button id="send-button" class="bg-blue-500 text-white hover:bg-blue-600">Send</button>
+            <label for="file-input" class="bg-gray-200 text-gray-700 p-2 rounded cursor-pointer mr-2">Attach File</label>
+            <input id="file-input" type="file" accept="image/*,.pdf,.txt" class="hidden">
+            <button id="send-button" class="bg-blue-500 text-white hover:bg-blue-600 mr-2">Send</button>
+            <button id="delete-history-button" class="bg-red-500 text-white hover:bg-red-600">Delete History</button>
+        </div>
+        <div class="footer-fineprint">
+            <a href="https://jeremyworld.org" class="mx-2">jeremyworld.org</a>
+            <a href="mailto:encryptedchat@jeremyworld.org" class="mx-2">encryptedchat@jeremyworld.org</a>
+            <a href="https://donate.jeremyworld.org" class="mx-2">donate.jeremyworld.org</a>
+            <div>Powered by Grok</div>
         </div>
     </div>
 
     <script>
         // Generate a short, memorable Peer ID
         function generateShortPeerId(username) {
-            const randomString = Math.random().toString(36).substring(2, 6); // 4-character random string
+            const randomString = Math.random().toString(36).substring(2, 6);
             return `${username.toLowerCase().replace(/[^a-z0-9]/g, '')}-${randomString}`;
         }
 
@@ -65,6 +97,8 @@
         const sendButton = document.getElementById('send-button');
         const peerIdInput = document.getElementById('peer-id-input');
         const connectButton = document.getElementById('connect-button');
+        const deleteHistoryButton = document.getElementById('delete-history-button');
+        const fileInput = document.getElementById('file-input');
         const myPeerId = document.getElementById('my-peer-id');
         const messages = document.getElementById('messages');
 
@@ -86,11 +120,27 @@
         function displayMessage(data) {
             const messageElement = document.createElement('div');
             messageElement.className = 'p-2 border-b';
-            messageElement.innerHTML = `<strong>${data.username}:</strong> ${data.message}`;
+            if (data.type === 'file') {
+                if (data.fileName.match(/\.(jpg|jpeg|png|gif)$/i)) {
+                    messageElement.innerHTML = `<strong>${data.username}:</strong><br><img src="${data.fileData}" class="max-w-full h-auto" alt="${data.fileName}">`;
+                } else {
+                    messageElement.innerHTML = `<strong>${data.username}:</strong> <a href="${data.fileData}" download="${data.fileName}" class="text-blue-500 hover:underline">${data.fileName}</a>`;
+                }
+            } else {
+                messageElement.innerHTML = `<strong>${data.username}:</strong> ${data.message}`;
+            }
             messages.appendChild(messageElement);
             messages.scrollTop = messages.scrollHeight;
             chatMessages.push(data);
             localStorage.setItem('chatMessages', JSON.stringify(chatMessages));
+        }
+
+        // Clear chat history
+        function clearChatHistory() {
+            localStorage.removeItem('chatMessages');
+            chatMessages = [{ username: 'System', message: 'Chat history cleared.', timestamp: Date.now() }];
+            messages.innerHTML = '';
+            displayMessage(chatMessages[0]);
         }
 
         // Display initial messages
@@ -134,6 +184,39 @@
                 }
                 messageInput.value = '';
             }
+        });
+
+        // Handle file input
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                if (file.size > 1024 * 1024) { // 1MB limit
+                    alert('File is too large. Please select a file under 1MB.');
+                    fileInput.value = '';
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const data = {
+                        username,
+                        type: 'file',
+                        fileName: file.name,
+                        fileData: reader.result,
+                        timestamp: Date.now()
+                    };
+                    displayMessage(data);
+                    if (conn && conn.open) {
+                        conn.send(data);
+                    }
+                    fileInput.value = '';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Delete history
+        deleteHistoryButton.addEventListener('click', () => {
+            clearChatHistory();
         });
 
         // Send message on Enter key
