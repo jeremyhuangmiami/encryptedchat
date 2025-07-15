@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Encrypted Chat</title>
+    <title>P2P Chat Platform</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <style>
@@ -63,7 +63,7 @@
 <body class="bg-gray-100">
     <div id="chat-container" class="bg-white shadow-lg">
         <h1 class="text-2xl font-bold mb-2 text-center">P2P Chat Platform</h1>
-        <p class="text-gray-500 italic mb-4 text-center">Share your Peer ID with another user to chat in real-time. Messages and files are stored locally.</p>
+        <p class="text-gray-500 italic mb-4 text-center">Share your Peer ID with another user to chat in real-time. Messages and files are stored locally until you leave the page.</p>
         <div class="mb-4">
             <label class="block text-gray-700">Your Peer ID: <span id="my-peer-id" class="font-mono"></span></label>
             <input id="peer-id-input" type="text" placeholder="Enter friend's Peer ID..." class="mr-2 mt-2">
@@ -102,8 +102,8 @@
         const myPeerId = document.getElementById('my-peer-id');
         const messages = document.getElementById('messages');
 
-        // Get or prompt for username
-        let username = localStorage.getItem('chatUsername') || prompt('Enter your username') || 'Anonymous';
+        // Prompt for username on every visit
+        let username = prompt('Enter your username') || 'Anonymous';
         localStorage.setItem('chatUsername', username);
 
         // Initialize PeerJS with short Peer ID
@@ -111,10 +111,14 @@
         const peer = new Peer(shortPeerId);
         let conn = null;
 
-        // Load messages from localStorage
-        let chatMessages = JSON.parse(localStorage.getItem('chatMessages')) || [
-            { username: 'System', message: 'Welcome to the chat! Share your Peer ID to connect with others.', timestamp: Date.now() }
-        ];
+        // Initialize with welcome message, ignoring localStorage
+        let chatMessages = [{ username: 'System', message: 'Welcome to the chat! Share your Peer ID to connect with others.', timestamp: Date.now() }];
+
+        // Clear localStorage on page exit
+        window.addEventListener('beforeunload', () => {
+            localStorage.removeItem('chatMessages');
+            localStorage.removeItem('chatUsername');
+        });
 
         // Display messages
         function displayMessage(data) {
@@ -138,7 +142,8 @@
         // Clear chat history
         function clearChatHistory() {
             localStorage.removeItem('chatMessages');
-            chatMessages = [{ username: 'System', message: 'Chat history cleared.', timestamp: Date.now() }];
+            localStorage.removeItem('chatUsername');
+            chatMessages = [{ username: 'System', message: 'Welcome to the chat! Share your Peer ID to connect with others.', timestamp: Date.now() }];
             messages.innerHTML = '';
             displayMessage(chatMessages[0]);
         }
